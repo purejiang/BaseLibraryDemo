@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.cyanrain.baselibrary"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 23

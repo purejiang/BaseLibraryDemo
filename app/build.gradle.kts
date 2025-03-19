@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.cyanrain.baselibrarydemo"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.cyanrain.baselibrarydemo"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -42,8 +42,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-    implementation(project(":BaseLibrary"))
     implementation(libs.gson)
+    implementation(project(":BaseLibrary"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
