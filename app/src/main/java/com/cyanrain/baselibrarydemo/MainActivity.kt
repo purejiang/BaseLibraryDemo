@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
 
         for (i in 0..10000) {
             executor.submit {
-                LogUtil.d("MainActivity", "id：$i")
+                LogUtil.d("MainActivity", "id：$i", RuntimeException("RuntimeException:$i"))
             }
         }
     }
