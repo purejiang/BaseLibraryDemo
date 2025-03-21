@@ -2,12 +2,15 @@ package com.cyanrain.baselibrary.utils
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import com.cyanrain.baselibrary.common.JsonConverter
+import com.cyanrain.baselibrary.utils.FileUtils.FileWriterBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -24,8 +27,8 @@ object LogUtil {
     private const val LOG_DIR_NAME = "lgu-logs"
     private const val LOG_PREFIX = "log_"
     private const val LOG_SUFFIX = ".txt"
-    public const val MAX_FILE_SIZE = 2 * 1024 * 1024L
-    public const val MAX_FILE_COUNT = 5
+    private const val MAX_FILE_SIZE = 2 * 1024 * 1024L
+    private const val MAX_FILE_COUNT = 5
 
     private lateinit var mConfig: Config
     private lateinit var mLogBeanConverter: LogBeanConverter
@@ -40,21 +43,15 @@ object LogUtil {
      * 初始化
      * @param context 上下文
      * @param converter json转换器
-     * @param config 配置
+     * @param block 配置
      *
      */
-    public fun init(
+    fun init(
         context: Context,
         converter: LogBeanConverter,
-        config: Config = Config(
-            isDebug = false,
-            isSaveFile = true,
-            saveFileDir = getDefaultDir(context),
-            maxFileSize = MAX_FILE_SIZE,
-            maxFileCount = MAX_FILE_COUNT
-        )
+        block: Config.Builder.() -> Unit
     ) {
-        mConfig = config
+        mConfig = Config.Builder(context = context).apply(block).build()
         mLogBeanConverter = converter
         if (mConfig.isSaveFile) {
             mConfig.saveFileDir.let {
@@ -67,6 +64,35 @@ object LogUtil {
         Log.d(TAG, "LogUtil init success")
     }
 
+
+    data class Config private constructor(
+        var isDebug: Boolean,
+        var isSaveFile: Boolean,
+        var saveFileDir: File,
+        var maxFileSize: Long,
+        var maxFileCount: Int
+    ) {
+        class Builder(context: Context) {
+            var isDebug: Boolean? = null
+            var isSaveFile: Boolean = false
+            var saveFileDir: File = getDefaultDir(context)
+            var maxFileSize: Long = MAX_FILE_SIZE
+            var maxFileCount: Int = MAX_FILE_COUNT
+
+            fun build(): Config {
+                return Config(
+                    isDebug = isDebug ?: false,
+                    isSaveFile = isSaveFile,
+                    saveFileDir = saveFileDir,
+                    maxFileSize = maxFileSize,
+                    maxFileCount = maxFileCount
+                )
+            }
+        }
+    }
+
+
+    // 如果不打印throwable出来，gson转换的时候就不会有stacktrace
     public fun v(tag: String, message: String, throwable: Throwable? = null) {
         log(LEVEL.VERBOSE, tag, message, throwable)
     }
@@ -172,10 +198,11 @@ object LogUtil {
 
     private suspend fun saveFile(logBean: LogBean) {
         val content = log2Str(logBean)
+//        Log.d(TAG, "content: $content")
         // 加锁
 //        mWriteLock.lock()
-        mMutex.lock()
-        try {
+        mMutex.withLock {
+            // 执行完会释放锁
             mConfig.let { cf ->
                 val targetFile = getCurrentActiveFile().also {
                     if (it.length() + content.length > cf.maxFileSize) {
@@ -188,11 +215,15 @@ object LogUtil {
                 // 维护文件数量
                 maintainFileCount()
             }
-        } finally {
-            // 解锁
-//            mWriteLock.unlock()
-            mMutex.unlock()
         }
+//        mMutex.lock()
+//        try {
+//
+//        } finally {
+        // 解锁
+//            mWriteLock.unlock()
+//            mMutex.unlock()
+//        }
     }
 
     /**
@@ -208,6 +239,7 @@ object LogUtil {
 //            }
             // 优化点：用bufferWrite，先缓存在内存，满了之后再写入，减少频繁的IO操作，但是在缓存期间应用被关闭/崩了，就不会写入了
             // 默认是8*1024
+            // use可以自动关闭流
             FileOutputStream(file, true).bufferedWriter().use {
                 it.append(content)
             }
@@ -279,13 +311,13 @@ object LogUtil {
         var threadInfo: String  // 线程信息
     )
 
-    public data class Config(
-        var isDebug: Boolean, // 是否是debug模式
-        var isSaveFile: Boolean,  // 是否保存日志文件
-        var saveFileDir: File,  // 保存路径
-        var maxFileSize: Long,  // 文件大小
-        var maxFileCount: Int = 5 // 文件数量
-    )
+//    public data class Config(
+//        var isDebug: Boolean, // 是否是debug模式
+//        var isSaveFile: Boolean,  // 是否保存日志文件
+//        var saveFileDir: File,  // 保存路径
+//        var maxFileSize: Long,  // 文件大小
+//        var maxFileCount: Int  // 文件数量
+//    )
 
     public enum class LEVEL {
         VERBOSE,  // 详细
